@@ -1,0 +1,137 @@
+/*
+  Language switcher for a multi-page static site with per-language folders.
+
+  Folders:
+    - /            : zh-Hant (繁體)
+    - /zh-cn/      : zh-Hans (简体)
+    - /en/         : English
+    - /ms/         : Bahasa Melayu
+
+  Behavior:
+    - Dropdown UI toggles language and redirects to the same page in the chosen folder
+    - Persists choice in localStorage
+    - Supports ?lang=zh-hant|zh-cn|en|ms for shareable links
+*/
+
+(() => {
+  const LANGS = [
+    { code: "zh-hant", label: "繁體", folder: "" },
+    { code: "zh-cn",   label: "简体", folder: "zh-cn" },
+    { code: "en",      label: "EN",   folder: "en" },
+    { code: "ms",      label: "BM",   folder: "ms" },
+  ];
+
+  const CODE_SET = new Set(LANGS.map(l => l.code));
+  const byCode = (c) => LANGS.find(l => l.code === c) || LANGS[0];
+  const STORAGE_KEY = "site_lang";
+
+  const qs = new URLSearchParams(window.location.search);
+  const forced = (qs.get("lang") || "").toLowerCase();
+
+  const path = window.location.pathname;
+  const segments = path.split("/").filter(Boolean); // ["en","pricing.html"] etc
+  const first = (segments[0] || "").toLowerCase();
+
+  const current = (first === "en" || first === "ms" || first === "zh-cn") ? first : "zh-hant";
+  const currentLang = byCode(current);
+
+  // Determine current page (file name)
+  const file = segments.length ? segments[segments.length - 1] : "index.html";
+  const hash = window.location.hash || "";
+
+  // Build target URL for a language code
+  const buildUrl = (code) => {
+    const lang = byCode(code);
+    const prefix = lang.folder ? `/${lang.folder}/` : `/`;
+    return `${prefix}${file}${hash}`;
+  };
+
+  // If link has ?lang=, redirect to folder version (and drop the param)
+  if (forced && CODE_SET.has(forced) && forced !== current) {
+    window.location.replace(buildUrl(forced));
+    return;
+  }
+
+  // If user previously chose a language, keep them in it across sessions
+  const saved = (localStorage.getItem(STORAGE_KEY) || "").toLowerCase();
+  if (saved && CODE_SET.has(saved) && saved !== current) {
+    // Avoid surprising redirects if user is already in a language folder and manually navigates
+    // (still allow redirect when they are on root, or when switching between folders directly)
+    const allowAutoRedirect = (current === "zh-hant");
+    if (allowAutoRedirect) {
+      window.location.replace(buildUrl(saved));
+      return;
+    }
+  }
+
+  // ---- UI wiring ----
+  const root = document.querySelector("[data-lang-switch]");
+  if (!root) return;
+
+  const btn = root.querySelector(".lang__btn");
+  const panel = root.querySelector(".lang__panel");
+  const label = root.querySelector("[data-lang-label]");
+
+  const setLabel = (code) => {
+    const lang = byCode(code);
+    if (label) label.textContent = lang.label;
+  };
+
+  // Populate menu if empty (defensive)
+  if (panel && panel.children.length === 0) {
+    LANGS.forEach(l => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "lang__item";
+      item.setAttribute("role", "option");
+      item.dataset.lang = l.code;
+      item.textContent = l.label;
+      panel.appendChild(item);
+    });
+  }
+
+  setLabel(current);
+
+  const open = () => {
+    if (!btn || !panel) return;
+    root.classList.add("is-open");
+    btn.setAttribute("aria-expanded", "true");
+  };
+
+  const close = () => {
+    if (!btn || !panel) return;
+    root.classList.remove("is-open");
+    btn.setAttribute("aria-expanded", "false");
+  };
+
+  btn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    root.classList.contains("is-open") ? close() : open();
+  });
+
+  // Click outside to close
+  document.addEventListener("click", (e) => {
+    if (!root.contains(e.target)) close();
+  });
+
+  // Choose language
+  panel?.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const code = (target.dataset.lang || "").toLowerCase();
+    if (!CODE_SET.has(code)) return;
+
+    localStorage.setItem(STORAGE_KEY, code);
+    setLabel(code);
+    close();
+
+    if (code !== current) {
+      window.location.href = buildUrl(code);
+    }
+  });
+
+  // ESC to close
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+  });
+})();

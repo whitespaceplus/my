@@ -1,0 +1,17 @@
+images/icon01.png
+images/bg0001.png 2048 × 1365
+images/logo001.png
+images/0001.png
+
+【品牌官網 / 公司網站】
+images/w001.png
+images/w002.png
+images/w003.png
+
+【软件生成】
+images/app001.png
+images/app002.png
+
+【內容系統 / 長期輸出】
+images/c001.png
+images/c002.png
